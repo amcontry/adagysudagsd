@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Confidential Document Portal</title>
+<style>
+body{margin:0;font-family:system-ui,sans-serif;background:#f4f6f8;color:#222}
+.container{max-width:900px;margin:60px auto;background:#fff;padding:40px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.1)}
+h1{font-size:22px;margin-bottom:20px}
+input,textarea,select,button{width:100%;padding:10px;margin:6px 0;font-size:14px}
+button{background:#2d6cdf;color:#fff;border:none;border-radius:6px;cursor:pointer}
+button.secondary{background:#e5e7eb;color:#333}
+.hidden{display:none}
+.card{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:10px}
+.level-국가기밀{color:#b91c1c;font-weight:600}
+.level-기밀{color:#92400e;font-weight:600}
+.level-일반{color:#065f46;font-weight:600}
+small{color:#666}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Confidential Document Portal</h1>
+
+<div id="login">
+  <input id="u" placeholder="Username">
+  <input id="p" type="password" placeholder="Password">
+  <button onclick="login()">Sign in</button>
+</div>
+
+<div id="admin" class="hidden">
+  <h3>User Management</h3>
+  <input id="nu" placeholder="New username">
+  <input id="np" placeholder="Password">
+  <button onclick="createUser()">Create</button>
+  <input id="du" placeholder="Delete username">
+  <button class="secondary" onclick="deleteUser()">Delete</button>
+</div>
+
+<div id="docs" class="hidden">
+  <h3>Register Document</h3>
+  <input id="title" placeholder="Title">
+  <textarea id="content" placeholder="Content"></textarea>
+  <select id="level"><option>일반</option><option>기밀</option><option>국가기밀</option></select>
+  <button onclick="save()">Save</button>
+
+  <h3>Search</h3>
+  <input id="q" placeholder="Keyword">
+  <button class="secondary" onclick="search()">Search</button>
+  <button class="secondary" onclick="load()">Reset</button>
+
+  <div id="list"></div>
+</div>
+
+</div>
+
+<script>
+let me = "";
+
+async function login(){
+  const username = document.getElementById("u").value;
+  const password = document.getElementById("p").value;
+
+  const r = await fetch("/login",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username,password})
+  });
+  if(!r.ok) return alert("Login failed");
+
+  const d = await r.json();
+  me = username;
+  document.getElementById("login").style.display="none";
+  document.getElementById("docs").classList.remove("hidden");
+  if(d.role==="admin") document.getElementById("admin").classList.remove("hidden");
+  load();
+}
+
+async function save(){
+  await fetch("/docs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:document.getElementById("title").value,content:document.getElementById("content").value,level:document.getElementById("level").value})});
+  document.getElementById("title").value="";
+  document.getElementById("content").value="";
+  load();
+}
+
+async function load(){
+  const r = await fetch("/docs");
+  const d = await r.json();
+  render(d);
+}
+
+async function search(){
+  const q = document.getElementById("q").value;
+  const r = await fetch("/docs/search?q="+encodeURIComponent(q));
+  const d = await r.json();
+  render(d);
+}
+
+function render(docs){
+  document.getElementById("list").innerHTML = docs.map(x=>`
+    <div class="card">
+      <div class="level-${x.level}">[${x.level}] ${x.title}</div>
+      <small>${x.author}</small>
+      <p>${x.content}</p>
+      ${x.author===me?`<button onclick="del(${x.id})">Delete</button>`:""}
+    </div>`).join("");
+}
+
+async function del(id){
+  await fetch("/docs/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+  load();
+}
+
+async function createUser(){
+  await fetch("/admin/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.getElementById("nu").value,password:document.getElementById("np").value})});
+}
+
+async function deleteUser(){
+  await fetch("/admin/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.getElementById("du").value})});
+}
+</script>
+</body>
+</html>
